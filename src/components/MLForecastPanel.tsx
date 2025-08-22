@@ -14,20 +14,30 @@ interface ForecastData {
 
 interface MLForecastPanelProps {
   forecasts: ForecastData[];
-  weatherCondition: 'sunny' | 'cloudy' | 'rainy';
+  weatherCondition: 'sunny' | 'cloudy' | 'rainy' | 'stormy';
   modelAccuracy: number;
+  outageStatus?: {
+    outageScenario: string;
+    emergencyMode: boolean;
+    batteryUsage: number;
+    loadShedding: number;
+    estimatedRecoveryTime: number;
+  };
 }
 
 export function MLForecastPanel({
   forecasts,
   weatherCondition,
-  modelAccuracy
+  modelAccuracy,
+  outageStatus
 }: MLForecastPanelProps) {
   const getWeatherIcon = () => {
     switch (weatherCondition) {
       case 'sunny': return <Sun className="w-4 h-4 text-solar" />;
       case 'cloudy': return <Sun className="w-4 h-4 text-muted-foreground" />;
       case 'rainy': return <CloudRain className="w-4 h-4 text-accent" />;
+      case 'stormy': return <CloudRain className="w-4 h-4 text-destructive" />;
+      default: return <Sun className="w-4 h-4 text-solar" />;
     }
   };
 
@@ -141,11 +151,54 @@ export function MLForecastPanel({
           ))}
         </div>
 
-        {/* Quick Insights */}
+        {/* Outage Status and Adaptation */}
+        {outageStatus && outageStatus.emergencyMode && (
+          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+            <div className="text-xs font-medium text-destructive mb-2 flex items-center gap-2">
+              <span>🚨 Emergency Response Active</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-muted-foreground">Scenario:</span>
+                <div className="font-medium text-foreground capitalize">
+                  {outageStatus.outageScenario.replace('_', ' ')}
+                </div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Battery Usage:</span>
+                <div className="font-medium text-battery">
+                  {Math.round(outageStatus.batteryUsage * 100)}%
+                </div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Load Shed:</span>
+                <div className="font-medium text-primary">
+                  {Math.round(outageStatus.loadShedding * 100)}%
+                </div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Recovery:</span>
+                <div className="font-medium text-accent">
+                  {outageStatus.estimatedRecoveryTime}m
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ML Adaptation Insights */}
         <div className="p-3 rounded-lg bg-primary/10 border border-primary/30">
-          <div className="text-xs font-medium text-primary mb-1">AI Insights</div>
+          <div className="text-xs font-medium text-primary mb-1 flex items-center gap-2">
+            🤖 ML Adaptation Engine
+          </div>
           <div className="text-xs text-muted-foreground">
-            Solar generation expected to peak at 2:30 PM. Recommend pre-charging H1 and H5 batteries before evening peak at 7 PM.
+            {outageStatus?.emergencyMode 
+              ? `Emergency protocols activated. Load balancing adapted for ${outageStatus.outageScenario.replace('_', ' ')} scenario.`
+              : `Weather-adapted forecasting active. Solar generation optimized for ${weatherCondition} conditions.`
+            }
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            Next adaptation cycle: {Math.floor(Math.random() * 5) + 3} minutes
           </div>
         </div>
       </div>

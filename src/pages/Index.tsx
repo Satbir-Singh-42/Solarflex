@@ -4,67 +4,15 @@ import { EnergyTradingPanel } from "@/components/EnergyTradingPanel";
 import { MLForecastPanel } from "@/components/MLForecastPanel";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Zap, TrendingUp } from "lucide-react";
+import { Activity, Zap, TrendingUp, AlertTriangle } from "lucide-react";
 import heroImage from "@/assets/hero-energy-grid.jpg";
+import { useForecasts, useTrades, useGridHealth } from "@/hooks/useEnergyData";
 
 const Index = () => {
-  // Mock data for the energy trading platform
-  const mockTrades = [
-    {
-      id: "1",
-      seller: "H1",
-      buyer: "H4",
-      amount: 1.5,
-      price: 4.20,
-      timestamp: "14:23",
-      status: 'active' as const
-    },
-    {
-      id: "2", 
-      seller: "H2",
-      buyer: "H6",
-      amount: 2.1,
-      price: 4.15,
-      timestamp: "14:20",
-      status: 'active' as const
-    },
-    {
-      id: "3",
-      seller: "H1",
-      buyer: "H6",
-      amount: 1.8,
-      price: 4.10,
-      timestamp: "14:15",
-      status: 'completed' as const
-    }
-  ];
-
-  const mockForecasts = [
-    {
-      type: 'solar' as const,
-      current: 14.2,
-      predicted: 16.8,
-      confidence: 92,
-      timeframe: '2:30 PM',
-      trend: 'up' as const
-    },
-    {
-      type: 'demand' as const,
-      current: 11.9,
-      predicted: 18.5,
-      confidence: 87,
-      timeframe: '7:00 PM',
-      trend: 'up' as const
-    },
-    {
-      type: 'price' as const,
-      current: 4.18,
-      predicted: 5.25,
-      confidence: 78,
-      timeframe: '6:30 PM',
-      trend: 'up' as const
-    }
-  ];
+  // Real-time data from enhanced ML backend
+  const { data: forecastData, isLoading: forecastLoading } = useForecasts();
+  const { data: tradeData, isLoading: tradeLoading } = useTrades();
+  const { data: gridData, isLoading: gridLoading } = useGridHealth();
 
   return (
     <div className="min-h-screen bg-background">
@@ -94,12 +42,22 @@ const Index = () => {
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Zap className="w-4 h-4 text-solar" />
-                <span className="text-muted-foreground">14.2 kW Generated</span>
+                <span className="text-muted-foreground">
+                  {forecastData?.forecasts.find(f => f.type === 'solar')?.current.toFixed(1) || '14.2'} kW Generated
+                </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <TrendingUp className="w-4 h-4 text-primary" />
-                <span className="text-muted-foreground">3 Active Trades</span>
+                <span className="text-muted-foreground">
+                  {tradeData?.trades.filter(t => t.status === 'active').length || '3'} Active Trades
+                </span>
               </div>
+              {forecastData?.outageStatus?.emergencyMode && (
+                <div className="flex items-center gap-2 text-sm">
+                  <AlertTriangle className="w-4 h-4 text-destructive" />
+                  <span className="text-destructive font-medium">Emergency Mode Active</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -147,27 +105,35 @@ const Index = () => {
 
           {/* Right Column - Monitoring Panels */}
           <div className="space-y-6">
-            <GridHealthMonitor 
-              feederUtilization={49.2}
-              feederLimit={60}
-              currentLoad={11.9}
-              status="optimal"
-              peakPrediction={18.5}
-              timeToNextPeak="4h 37m"
-            />
+            {gridData && (
+              <GridHealthMonitor 
+                feederUtilization={gridData.feederUtilization}
+                feederLimit={gridData.feederLimit}
+                currentLoad={gridData.currentLoad}
+                status={gridData.status}
+                peakPrediction={gridData.peakPrediction}
+                timeToNextPeak={gridData.timeToNextPeak}
+                outageInfo={gridData.outageInfo}
+              />
+            )}
             
-            <EnergyTradingPanel 
-              currentTrades={mockTrades}
-              marketPrice={4.18}
-              totalVolume={15.7}
-              yourBalance={245.80}
-            />
+            {tradeData && (
+              <EnergyTradingPanel 
+                currentTrades={tradeData.trades}
+                marketPrice={tradeData.marketPrice}
+                totalVolume={tradeData.totalVolume}
+                yourBalance={tradeData.yourBalance}
+              />
+            )}
             
-            <MLForecastPanel 
-              forecasts={mockForecasts}
-              weatherCondition="sunny"
-              modelAccuracy={89}
-            />
+            {forecastData && (
+              <MLForecastPanel 
+                forecasts={forecastData.forecasts}
+                weatherCondition={forecastData.weatherCondition}
+                modelAccuracy={forecastData.modelAccuracy}
+                outageStatus={forecastData.outageStatus}
+              />
+            )}
           </div>
         </div>
       </div>

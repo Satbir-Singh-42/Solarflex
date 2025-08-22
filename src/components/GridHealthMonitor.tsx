@@ -10,6 +10,11 @@ interface GridHealthMonitorProps {
   status: 'optimal' | 'warning' | 'critical';
   peakPrediction: number;
   timeToNextPeak: string;
+  outageInfo?: {
+    scenario: string;
+    estimatedRecovery: string;
+    batteryUsage: string;
+  };
 }
 
 export function GridHealthMonitor({
@@ -18,7 +23,8 @@ export function GridHealthMonitor({
   currentLoad,
   status,
   peakPrediction,
-  timeToNextPeak
+  timeToNextPeak,
+  outageInfo
 }: GridHealthMonitorProps) {
   const utilizationPercent = (feederUtilization / feederLimit) * 100;
   
@@ -108,11 +114,41 @@ export function GridHealthMonitor({
             <div className="text-sm font-medium text-foreground">{timeToNextPeak}</div>
           </div>
 
+          {/* Outage Information */}
+          {outageInfo && (
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+              <div className="text-xs font-medium text-destructive mb-2">
+                ⚠️ Power Outage Detected
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <span className="text-muted-foreground">Type:</span>
+                  <div className="font-medium text-foreground capitalize">
+                    {outageInfo.scenario.replace('_', ' ')}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Battery:</span>
+                  <div className="font-medium text-battery">
+                    {outageInfo.batteryUsage}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Recovery:</span>
+                  <div className="font-medium text-accent">
+                    {outageInfo.estimatedRecovery}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Status Message */}
           <div className="text-xs text-muted-foreground">
-            {status === 'optimal' && "All systems operating within normal parameters"}
+            {status === 'optimal' && !outageInfo && "All systems operating within normal parameters"}
             {status === 'warning' && "Approaching feeder capacity limits - load balancing active"}
-            {status === 'critical' && "Critical load detected - implementing emergency protocols"}
+            {status === 'critical' && outageInfo && "Emergency protocols active - grid adaptation in progress"}
+            {status === 'critical' && !outageInfo && "Critical load detected - implementing emergency protocols"}
           </div>
         </div>
       </div>
