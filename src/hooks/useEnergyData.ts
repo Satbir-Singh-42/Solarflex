@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-const API_BASE_URL = `http://${window.location.hostname}:3001/api`;
+// Use relative URL for API to avoid CORS issues in Replit
+const API_BASE_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3001/api'
+  : '/api';
 
 interface Trade {
   id: string;
@@ -54,7 +57,10 @@ export const useForecasts = () => {
   return useQuery<ForecastResponse>({
     queryKey: ['forecasts'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/forecasts`);
+      const response = await fetch(`${API_BASE_URL}/forecasts`, {
+        mode: 'cors',
+        credentials: 'include',
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch forecasts');
       }
@@ -68,7 +74,10 @@ export const useTrades = () => {
   return useQuery<TradeData>({
     queryKey: ['trades'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/trades`);
+      const response = await fetch(`${API_BASE_URL}/trades`, {
+        mode: 'cors',
+        credentials: 'include',
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch trades');
       }
@@ -82,7 +91,10 @@ export const useGridHealth = () => {
   return useQuery<GridHealthData>({
     queryKey: ['grid-health'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/grid-health`);
+      const response = await fetch(`${API_BASE_URL}/grid-health`, {
+        mode: 'cors',
+        credentials: 'include',
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch grid health');
       }
