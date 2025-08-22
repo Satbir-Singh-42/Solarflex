@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = `http://${window.location.hostname}:3001/api`;
 
 interface Trade {
   id: string;

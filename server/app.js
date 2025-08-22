@@ -15,6 +15,166 @@ app.use(express.json());
 // MongoDB connection
 let db;
 const mongoUrl = process.env.MONGODB_URI || 'mongodb://localhost:27017/energy-grid';
+const googleApiKey = process.env.GOOGLE_API_KEY;
+
+// Initialize MongoDB connection
+async function connectToMongoDB() {
+  try {
+    const client = new MongoClient(mongoUrl);
+    await client.connect();
+    db = client.db('energy-grid');
+    console.log('✅ Connected to MongoDB successfully');
+    
+    // Initialize collections if they don't exist
+    await initializeCollections();
+  } catch (error) {
+    console.log('⚠️ MongoDB connection failed, using in-memory data:', error.message);
+    db = null;
+  }
+}
+
+// Initialize MongoDB collections with real data
+async function initializeCollections() {
+  if (!db) return;
+  
+  try {
+    // Create trades collection with real data
+    const tradesCollection = db.collection('trades');
+    const existingTrades = await tradesCollection.countDocuments();
+    
+    if (existingTrades === 0) {
+      const initialTrades = [
+        {
+          id: "T001",
+          seller: "H1",
+          buyer: "H4", 
+          amount: 2.3,
+          price: 4.25,
+          timestamp: new Date(),
+          status: 'completed',
+          createdAt: new Date()
+        },
+        {
+          id: "T002",
+          seller: "H3",
+          buyer: "H6",
+          amount: 1.8,
+          price: 4.15,
+          timestamp: new Date(),
+          status: 'active',
+          createdAt: new Date()
+        }
+      ];
+      await tradesCollection.insertMany(initialTrades);
+      console.log('✅ Initialized trades collection');
+    }
+
+    // Create forecasts collection
+    const forecastsCollection = db.collection('forecasts');
+    const existingForecasts = await forecastsCollection.countDocuments();
+    
+    if (existingForecasts === 0) {
+      const initialForecast = {
+        timestamp: new Date(),
+        weatherCondition: 'sunny',
+        modelAccuracy: 89,
+        forecasts: [
+          {
+            type: 'solar',
+            current: 15.2,
+            predicted: 17.8,
+            confidence: 92,
+            timeframe: '2:30 PM',
+            trend: 'up'
+          }
+        ],
+        createdAt: new Date()
+      };
+      await forecastsCollection.insertOne(initialForecast);
+      console.log('✅ Initialized forecasts collection');
+    }
+
+    // Create grid health collection
+    const gridCollection = db.collection('grid_health');
+    const existingGrid = await gridCollection.countDocuments();
+    
+    if (existingGrid === 0) {
+      const initialGrid = {
+        timestamp: new Date(),
+        feederUtilization: 45.2,
+        feederLimit: 60,
+        currentLoad: 12.8,
+        status: 'optimal',
+        peakPrediction: 19.2,
+        timeToNextPeak: '4h 15m',
+        createdAt: new Date()
+      };
+      await gridCollection.insertOne(initialGrid);
+      console.log('✅ Initialized grid health collection');
+    }
+
+  } catch (error) {
+    console.error('Error initializing collections:', error);
+  }
+}
+
+// MongoDB data operations
+async function saveTradeToMongoDB(trade) {
+  if (!db) return null;
+  try {
+    const result = await db.collection('trades').insertOne({
+      ...trade,
+      createdAt: new Date()
+    });
+    return result;
+  } catch (error) {
+    console.error('Error saving trade:', error);
+    return null;
+  }
+}
+
+async function getTradesFromMongoDB() {
+  if (!db) return null;
+  try {
+    const trades = await db.collection('trades')
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .toArray();
+    return trades;
+  } catch (error) {
+    console.error('Error fetching trades:', error);
+    return null;
+  }
+}
+
+async function saveForecastToMongoDB(forecast) {
+  if (!db) return null;
+  try {
+    const result = await db.collection('forecasts').insertOne({
+      ...forecast,
+      createdAt: new Date()
+    });
+    return result;
+  } catch (error) {
+    console.error('Error saving forecast:', error);
+    return null;
+  }
+}
+
+async function saveGridHealthToMongoDB(gridHealth) {
+  if (!db) return null;
+  try {
+    const result = await db.collection('grid_health').insertOne({
+      ...gridHealth,
+      createdAt: new Date()
+    });
+    return result;
+  } catch (error) {
+    console.error('Error saving grid health:', error);
+    return null;
+  }
+}
 
 // Enhanced ML Forecasting System
 class MLForecastingEngine {
@@ -247,9 +407,13 @@ function generateRealEnergyTrades() {
 }
 
 // API Routes
-app.get('/api/forecasts', (req, res) => {
+app.get('/api/forecasts', async (req, res) => {
   try {
     const forecastData = mlEngine.generateForecasts();
+    
+    // Save to MongoDB
+    await saveForecastToMongoDB(forecastData);
+    
     res.json(forecastData);
   } catch (error) {
     console.error('Error generating forecasts:', error);
@@ -257,16 +421,35 @@ app.get('/api/forecasts', (req, res) => {
   }
 });
 
-app.get('/api/trades', (req, res) => {
+app.get('/api/trades', async (req, res) => {
   try {
-    const trades = generateRealEnergyTrades();
+    // Try to get trades from MongoDB first
+    let trades = await getTradesFromMongoDB();
+    
+    if (!trades) {
+      // Fallback to generated data if MongoDB unavailable
+      trades = generateRealEnergyTrades();
+    } else {
+      // Add some new live trades to MongoDB data
+      const liveTrades = generateRealEnergyTrades();
+      const recentTrades = liveTrades.slice(0, 2);
+      
+      // Save new trades to MongoDB
+      for (const trade of recentTrades) {
+        await saveTradeToMongoDB(trade);
+      }
+      
+      // Combine MongoDB trades with new ones
+      trades = [...recentTrades, ...trades];
+    }
+
     const marketPrice = 3.8 + Math.random() * 1.4;
     const totalVolume = trades.reduce((sum, trade) => 
       trade.status === 'completed' ? sum + trade.amount : sum, 0
     );
     
     res.json({
-      trades,
+      trades: trades.slice(0, 15), // Limit to recent trades
       marketPrice: Math.round(marketPrice * 100) / 100,
       totalVolume: Math.round(totalVolume * 10) / 10,
       yourBalance: 245.80 + (Math.random() - 0.5) * 50
@@ -277,7 +460,7 @@ app.get('/api/trades', (req, res) => {
   }
 });
 
-app.get('/api/grid-health', (req, res) => {
+app.get('/api/grid-health', async (req, res) => {
   try {
     const forecastData = mlEngine.generateForecasts();
     const outageStatus = forecastData.outageStatus;
@@ -286,7 +469,7 @@ app.get('/api/grid-health', (req, res) => {
     if (outageStatus.emergencyMode) status = 'critical';
     else if (outageStatus.loadShedding > 0.1) status = 'warning';
 
-    res.json({
+    const gridHealthData = {
       feederUtilization: 30 + Math.random() * 30,
       feederLimit: 60,
       currentLoad: outageStatus.adaptedLoad,
@@ -297,8 +480,14 @@ app.get('/api/grid-health', (req, res) => {
         scenario: outageStatus.outageScenario,
         estimatedRecovery: `${outageStatus.estimatedRecoveryTime} minutes`,
         batteryUsage: `${Math.round(outageStatus.batteryUsage * 100)}%`
-      } : null
-    });
+      } : null,
+      timestamp: new Date()
+    };
+
+    // Save to MongoDB
+    await saveGridHealthToMongoDB(gridHealthData);
+
+    res.json(gridHealthData);
   } catch (error) {
     console.error('Error generating grid health data:', error);
     res.status(500).json({ error: 'Failed to generate grid health data' });
@@ -310,8 +499,17 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Energy Grid ML Server running on port ${PORT}`);
-  console.log(`🤖 Enhanced ML Forecasting Engine initialized`);
-  console.log(`⚡ Real-time weather and outage adaptation enabled`);
-});
+// Initialize server
+async function startServer() {
+  await connectToMongoDB();
+  
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Energy Grid ML Server running on port ${PORT}`);
+    console.log(`🤖 Enhanced ML Forecasting Engine initialized`);
+    console.log(`⚡ Real-time weather and outage adaptation enabled`);
+    console.log(`🔑 Google API Key configured: ${googleApiKey ? 'Yes' : 'No'}`);
+    console.log(`🗄️ MongoDB connection: ${db ? 'Connected' : 'Fallback mode'}`);
+  });
+}
+
+startServer().catch(console.error);
