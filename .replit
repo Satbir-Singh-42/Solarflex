@@ -49,13 +49,13 @@ waitForPort = 3001
 name = "Frontend App"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev"
-waitForPort = 5000
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev -- --config vite.config.local.ts"
+waitForPort = 5000
 
 [agent]
 expertMode = true
