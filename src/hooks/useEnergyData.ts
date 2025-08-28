@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-// Use relative URL for API to avoid CORS issues in Replit
+// Use dynamic URL based on environment
 const API_BASE_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:3001/api'
-  : '/api';
+  : `https://${window.location.hostname.replace('-00-', '-01-').replace('.kirk.', '.spock.')}/api`;
 
 interface Trade {
   id: string;

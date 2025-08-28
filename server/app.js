@@ -509,17 +509,15 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Serve static files in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../dist')));
-  
-  // Handle React Router (return `index.html` for any non-API routes)
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(__dirname, '../dist/index.html'));
-    }
+// Simple health check for root
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Energy Grid ML Server is running!', 
+    api: '/api',
+    status: 'OK',
+    timestamp: new Date().toISOString() 
   });
-}
+});
 
 // Initialize server
 async function startServer() {
