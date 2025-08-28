@@ -54,7 +54,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev -- --config vite.config.local.ts"
+args = "npm run dev"
 waitForPort = 5000
 
 [agent]
