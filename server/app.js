@@ -37,8 +37,8 @@ const googleApiKey = process.env.GOOGLE_API_KEY;
 async function connectToPostgreSQL() {
   try {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+      connectionString: process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_fH20gIEapTGu@ep-wispy-rice-adzywm4p-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
+      ssl: { rejectUnauthorized: false }
     });
     
     await pool.query('SELECT NOW()');
