@@ -1,22 +1,93 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { NeighborhoodView } from "@/components/NeighborhoodView";
 import { GridHealthMonitor } from "@/components/GridHealthMonitor";
 import { EnergyTradingPanel } from "@/components/EnergyTradingPanel";
 import { MLForecastPanel } from "@/components/MLForecastPanel";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Zap, TrendingUp, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Activity, Zap, TrendingUp, AlertTriangle, User, LogOut } from "lucide-react";
 import heroImage from "@/assets/hero-energy-grid.jpg";
 import { useForecasts, useTrades, useGridHealth } from "@/hooks/useEnergyData";
 
 const Index = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const navigate = useNavigate();
+  
   // Real-time data from enhanced ML backend
   const { data: forecastData, isLoading: forecastLoading } = useForecasts();
   const { data: tradeData, isLoading: tradeLoading } = useTrades();
   const { data: gridData, isLoading: gridLoading } = useGridHealth();
 
+  // Check authentication status
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+    if (token && userData) {
+      setIsAuthenticated(true);
+      setUser(JSON.parse(userData));
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setIsAuthenticated(false);
+    setUser(null);
+    navigate('/');
+  };
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Navigation Bar */}
+      <div className="w-full bg-white/80 backdrop-blur-sm border-b border-border/50 sticky top-0 z-50">
+        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-green-500 to-blue-600 rounded-lg">
+              <Zap className="h-5 w-5 text-white" />
+            </div>
+            <span className="text-lg font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+              Solar Weave Network
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            {isAuthenticated ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  <span className="text-sm font-medium">Welcome, {user?.username}</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="flex items-center gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link to="/login">
+                  <Button variant="outline" size="sm">
+                    Sign In
+                  </Button>
+                </Link>
+                <Link to="/signup">
+                  <Button size="sm" className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700">
+                    Get Started
+                  </Button>
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Hero Section */}
       <div className="relative h-64 overflow-hidden">
         <img 
