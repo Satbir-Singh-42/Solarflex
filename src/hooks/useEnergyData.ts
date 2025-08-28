@@ -1,24 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-// Use dynamic URL based on environment  
-const getApiBaseUrl = () => {
-  if (typeof window === 'undefined') return 'http://localhost:3001/api';
-  
-  const hostname = window.location.hostname;
-  
-  // Check if we're in a Replit environment
-  if (hostname.includes('replit') || hostname.includes('.app')) {
-    // For Replit, replace port 00 with 01 to access backend
-    const backendUrl = `https://${hostname.replace('-00-', '-01-')}/api`;
-    return backendUrl;
-  }
-  
-  // Default to localhost for local development
-  return 'http://localhost:3001/api';
-};
-
-const API_BASE_URL = getApiBaseUrl();
+// Production API configuration
+const API_BASE_URL = window.location.port === '5000' 
+  ? `http://${window.location.hostname}:3001/api`
+  : 'http://localhost:3001/api';
 
 interface Trade {
   id: string;

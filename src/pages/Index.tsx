@@ -28,7 +28,7 @@ const Index = () => {
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center space-y-4">
             <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/30">
-              Live Demo • Street-12
+              Live Trading • Sector-12
             </Badge>
             <h1 className="text-4xl font-bold text-foreground">
               Solar Weave Network

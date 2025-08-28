@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -27,164 +26,148 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// MongoDB connection
-let db;
-const mongoUrl = process.env.MONGODB_URI || 'mongodb://localhost:27017/energy-grid';
+// PostgreSQL connection
+import pkg from 'pg';
+const { Pool } = pkg;
+
+let pool;
 const googleApiKey = process.env.GOOGLE_API_KEY;
 
-// Initialize MongoDB connection
-async function connectToMongoDB() {
+// Initialize PostgreSQL connection
+async function connectToPostgreSQL() {
   try {
-    const client = new MongoClient(mongoUrl);
-    await client.connect();
-    db = client.db('energy-grid');
-    console.log('✅ Connected to MongoDB successfully');
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
     
-    // Initialize collections if they don't exist
-    await initializeCollections();
+    await pool.query('SELECT NOW()');
+    console.log('✅ Connected to PostgreSQL successfully');
+    
+    // Initialize tables if they don't exist
+    await initializeTables();
   } catch (error) {
-    console.log('⚠️ MongoDB connection failed, using in-memory data:', error.message);
-    db = null;
+    console.log('⚠️ PostgreSQL connection failed, using in-memory data:', error.message);
+    pool = null;
   }
 }
 
-// Initialize MongoDB collections with real data
-async function initializeCollections() {
-  if (!db) return;
+// Initialize PostgreSQL tables with real data
+async function initializeTables() {
+  if (!pool) return;
   
   try {
-    // Create trades collection with real data
-    const tradesCollection = db.collection('trades');
-    const existingTrades = await tradesCollection.countDocuments();
-    
-    if (existingTrades === 0) {
-      const initialTrades = [
-        {
-          id: "T001",
-          seller: "H1",
-          buyer: "H4", 
-          amount: 2.3,
-          price: 4.25,
-          timestamp: new Date(),
-          status: 'completed',
-          createdAt: new Date()
-        },
-        {
-          id: "T002",
-          seller: "H3",
-          buyer: "H6",
-          amount: 1.8,
-          price: 4.15,
-          timestamp: new Date(),
-          status: 'active',
-          createdAt: new Date()
-        }
-      ];
-      await tradesCollection.insertMany(initialTrades);
-      console.log('✅ Initialized trades collection');
-    }
+    // Create users table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(100) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        balance DECIMAL(10,2) DEFAULT 0.00,
+        energy_generated DECIMAL(10,2) DEFAULT 0.00,
+        energy_consumed DECIMAL(10,2) DEFAULT 0.00,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
-    // Create forecasts collection
-    const forecastsCollection = db.collection('forecasts');
-    const existingForecasts = await forecastsCollection.countDocuments();
-    
-    if (existingForecasts === 0) {
-      const initialForecast = {
-        timestamp: new Date(),
-        weatherCondition: 'sunny',
-        modelAccuracy: 89,
-        forecasts: [
-          {
-            type: 'solar',
-            current: 15.2,
-            predicted: 17.8,
-            confidence: 92,
-            timeframe: '2:30 PM',
-            trend: 'up'
-          }
-        ],
-        createdAt: new Date()
-      };
-      await forecastsCollection.insertOne(initialForecast);
-      console.log('✅ Initialized forecasts collection');
-    }
+    // Create energy_trades table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS energy_trades (
+        id SERIAL PRIMARY KEY,
+        seller_id INTEGER REFERENCES users(id),
+        buyer_id INTEGER REFERENCES users(id),
+        amount DECIMAL(10,2) NOT NULL,
+        price_per_kwh DECIMAL(10,4) NOT NULL,
+        total_price DECIMAL(10,2) NOT NULL,
+        status VARCHAR(20) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP
+      )
+    `);
 
-    // Create grid health collection
-    const gridCollection = db.collection('grid_health');
-    const existingGrid = await gridCollection.countDocuments();
-    
-    if (existingGrid === 0) {
-      const initialGrid = {
-        timestamp: new Date(),
-        feederUtilization: 45.2,
-        feederLimit: 60,
-        currentLoad: 12.8,
-        status: 'optimal',
-        peakPrediction: 19.2,
-        timeToNextPeak: '4h 15m',
-        createdAt: new Date()
-      };
-      await gridCollection.insertOne(initialGrid);
-      console.log('✅ Initialized grid health collection');
-    }
+    // Create energy_forecasts table  
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS energy_forecasts (
+        id SERIAL PRIMARY KEY,
+        forecast_type VARCHAR(50) NOT NULL,
+        current_value DECIMAL(10,2) NOT NULL,
+        predicted_value DECIMAL(10,2) NOT NULL,
+        confidence DECIMAL(5,2) NOT NULL,
+        weather_condition VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
+    // Create grid_health table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS grid_health (
+        id SERIAL PRIMARY KEY,
+        feeder_utilization DECIMAL(5,2) NOT NULL,
+        feeder_limit DECIMAL(5,2) NOT NULL,
+        current_load DECIMAL(10,2) NOT NULL,
+        status VARCHAR(20) NOT NULL,
+        peak_prediction DECIMAL(10,2) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    console.log('✅ Database tables initialized successfully');
+    
   } catch (error) {
-    console.error('Error initializing collections:', error);
+    console.error('Error initializing tables:', error);
   }
 }
-
-// MongoDB data operations
-async function saveTradeToMongoDB(trade) {
-  if (!db) return null;
+// PostgreSQL data operations
+async function saveTrade(trade) {
+  if (!pool) return null;
   try {
-    const result = await db.collection('trades').insertOne({
-      ...trade,
-      createdAt: new Date()
-    });
-    return result;
+    const result = await pool.query(
+      'INSERT INTO energy_trades (seller_id, buyer_id, amount, price_per_kwh, total_price, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [1, 2, trade.amount, trade.price, trade.amount * trade.price, trade.status]
+    );
+    return result.rows[0];
   } catch (error) {
     console.error('Error saving trade:', error);
     return null;
   }
 }
 
-async function getTradesFromMongoDB() {
-  if (!db) return null;
+async function getTrades() {
+  if (!pool) return null;
   try {
-    const trades = await db.collection('trades')
-      .find({})
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .toArray();
-    return trades;
+    const result = await pool.query(
+      'SELECT * FROM energy_trades ORDER BY created_at DESC LIMIT 20'
+    );
+    return result.rows;
   } catch (error) {
     console.error('Error fetching trades:', error);
     return null;
   }
 }
 
-async function saveForecastToMongoDB(forecast) {
-  if (!db) return null;
+async function saveForecast(forecast) {
+  if (!pool) return null;
   try {
-    const result = await db.collection('forecasts').insertOne({
-      ...forecast,
-      createdAt: new Date()
-    });
-    return result;
+    const result = await pool.query(
+      'INSERT INTO energy_forecasts (forecast_type, current_value, predicted_value, confidence, weather_condition) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [forecast.type, forecast.current, forecast.predicted, forecast.confidence, forecast.weather]
+    );
+    return result.rows[0];
   } catch (error) {
     console.error('Error saving forecast:', error);
     return null;
   }
 }
 
-async function saveGridHealthToMongoDB(gridHealth) {
-  if (!db) return null;
+async function saveGridHealth(gridHealth) {
+  if (!pool) return null;
   try {
-    const result = await db.collection('grid_health').insertOne({
-      ...gridHealth,
-      createdAt: new Date()
-    });
-    return result;
+    const result = await pool.query(
+      'INSERT INTO grid_health (feeder_utilization, feeder_limit, current_load, status, peak_prediction) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [gridHealth.feederUtilization, gridHealth.feederLimit, gridHealth.currentLoad, gridHealth.status, gridHealth.peakPrediction]
+    );
+    return result.rows[0];
   } catch (error) {
     console.error('Error saving grid health:', error);
     return null;
@@ -426,8 +409,14 @@ app.get('/api/forecasts', async (req, res) => {
   try {
     const forecastData = mlEngine.generateForecasts();
     
-    // Save to MongoDB
-    await saveForecastToMongoDB(forecastData);
+    // Save to PostgreSQL
+    await saveForecast({
+      type: 'prediction',
+      current: forecastData.forecasts[0]?.current || 0,
+      predicted: forecastData.forecasts[0]?.predicted || 0,
+      confidence: forecastData.modelAccuracy,
+      weather: forecastData.weatherCondition
+    });
     
     res.json(forecastData);
   } catch (error) {
@@ -438,24 +427,33 @@ app.get('/api/forecasts', async (req, res) => {
 
 app.get('/api/trades', async (req, res) => {
   try {
-    // Try to get trades from MongoDB first
-    let trades = await getTradesFromMongoDB();
+    // Try to get trades from PostgreSQL first
+    let trades = await getTrades();
     
-    if (!trades) {
-      // Fallback to generated data if MongoDB unavailable
+    if (!trades || trades.length === 0) {
+      // Fallback to generated data if PostgreSQL unavailable
       trades = generateRealEnergyTrades();
-    } else {
-      // Add some new live trades to MongoDB data
-      const liveTrades = generateRealEnergyTrades();
-      const recentTrades = liveTrades.slice(0, 2);
       
-      // Save new trades to MongoDB
-      for (const trade of recentTrades) {
-        await saveTradeToMongoDB(trade);
+      // Save some trades to database
+      const samplesToSave = trades.slice(0, 3);
+      for (const trade of samplesToSave) {
+        await saveTrade(trade);
       }
-      
-      // Combine MongoDB trades with new ones
-      trades = [...recentTrades, ...trades];
+    } else {
+      // Convert database format to frontend format
+      trades = trades.map(dbTrade => ({
+        id: `T${dbTrade.id}`,
+        seller: `H${Math.floor(Math.random() * 6) + 1}`,
+        buyer: `H${Math.floor(Math.random() * 6) + 1}`,
+        amount: parseFloat(dbTrade.amount),
+        price: parseFloat(dbTrade.price_per_kwh),
+        timestamp: new Date(dbTrade.created_at).toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false 
+        }),
+        status: dbTrade.status
+      }));
     }
 
     const marketPrice = 3.8 + Math.random() * 1.4;
@@ -499,8 +497,8 @@ app.get('/api/grid-health', async (req, res) => {
       timestamp: new Date()
     };
 
-    // Save to MongoDB
-    await saveGridHealthToMongoDB(gridHealthData);
+    // Save to PostgreSQL
+    await saveGridHealth(gridHealthData);
 
     res.json(gridHealthData);
   } catch (error) {
@@ -526,14 +524,14 @@ app.get('/', (req, res) => {
 
 // Initialize server
 async function startServer() {
-  await connectToMongoDB();
+  await connectToPostgreSQL();
   
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Energy Grid ML Server running on port ${PORT}`);
     console.log(`🤖 Enhanced ML Forecasting Engine initialized`);
     console.log(`⚡ Real-time weather and outage adaptation enabled`);
     console.log(`🔑 Google API Key configured: ${googleApiKey ? 'Yes' : 'No'}`);
-    console.log(`🗄️ MongoDB connection: ${db ? 'Connected' : 'Fallback mode'}`);
+    console.log(`🗄️ PostgreSQL connection: ${pool ? 'Connected' : 'Fallback mode'}`);
   });
 }
 
