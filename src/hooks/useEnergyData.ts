@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 // Use dynamic URL based on environment
-const API_BASE_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:3001/api'
-  : `https://${window.location.hostname.replace('-00-', '-01-').replace('.kirk.', '.spock.')}/api`;
+const API_BASE_URL = 'http://localhost:3001/api';
 
 interface Trade {
   id: string;

@@ -1,3 +1,4 @@
+import React from "react";
 import { NeighborhoodView } from "@/components/NeighborhoodView";
 import { GridHealthMonitor } from "@/components/GridHealthMonitor";
 import { EnergyTradingPanel } from "@/components/EnergyTradingPanel";
