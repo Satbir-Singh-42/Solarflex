@@ -12,15 +12,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
+// Middleware - Allow all origins for Replit environment
 app.use(cors({
-  origin: [
-    'http://localhost:5000',
-    'https://localhost:5000',
-    /.*\.replit\.dev$/,
-    /.*\.repl\.co$/
-  ],
-  credentials: true,
+  origin: '*',
+  credentials: false,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -348,61 +343,7 @@ class MLForecastingEngine {
 // Initialize ML Engine
 const mlEngine = new MLForecastingEngine();
 
-// Real energy trading data generator
-function generateRealEnergyTrades() {
-  const houses = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
-  const trades = [];
-  const completedTrades = [];
-
-  // Generate active trades
-  for (let i = 0; i < 3 + Math.floor(Math.random() * 3); i++) {
-    const seller = houses[Math.floor(Math.random() * houses.length)];
-    let buyer = houses[Math.floor(Math.random() * houses.length)];
-    while (buyer === seller) {
-      buyer = houses[Math.floor(Math.random() * houses.length)];
-    }
-
-    trades.push({
-      id: `T${Date.now()}-${i}`,
-      seller,
-      buyer,
-      amount: Math.round((1 + Math.random() * 3) * 10) / 10,
-      price: Math.round((3.8 + Math.random() * 1.2) * 100) / 100,
-      timestamp: new Date().toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false 
-      }),
-      status: 'active'
-    });
-  }
-
-  // Generate completed trades
-  for (let i = 0; i < 5; i++) {
-    const seller = houses[Math.floor(Math.random() * houses.length)];
-    let buyer = houses[Math.floor(Math.random() * houses.length)];
-    while (buyer === seller) {
-      buyer = houses[Math.floor(Math.random() * houses.length)];
-    }
-
-    const pastTime = new Date(Date.now() - Math.random() * 3600000); // Random time in past hour
-    completedTrades.push({
-      id: `T${pastTime.getTime()}-${i}`,
-      seller,
-      buyer,
-      amount: Math.round((0.5 + Math.random() * 2.5) * 10) / 10,
-      price: Math.round((3.5 + Math.random() * 1.5) * 100) / 100,
-      timestamp: pastTime.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false 
-      }),
-      status: 'completed'
-    });
-  }
-
-  return [...trades, ...completedTrades];
-}
+// Real database data retrieval only - no fake data generation
 
 // API Routes
 app.get('/api/forecasts', async (req, res) => {
@@ -427,24 +368,17 @@ app.get('/api/forecasts', async (req, res) => {
 
 app.get('/api/trades', async (req, res) => {
   try {
-    // Try to get trades from PostgreSQL first
+    // Get trades from PostgreSQL database only
     let trades = await getTrades();
     
-    if (!trades || trades.length === 0) {
-      // Fallback to generated data if PostgreSQL unavailable
-      trades = generateRealEnergyTrades();
-      
-      // Save some trades to database
-      const samplesToSave = trades.slice(0, 3);
-      for (const trade of samplesToSave) {
-        await saveTrade(trade);
-      }
+    if (!trades) {
+      trades = [];
     } else {
-      // Convert database format to frontend format
+      // Convert database format to frontend format  
       trades = trades.map(dbTrade => ({
         id: `T${dbTrade.id}`,
-        seller: `H${Math.floor(Math.random() * 6) + 1}`,
-        buyer: `H${Math.floor(Math.random() * 6) + 1}`,
+        seller: `House ${dbTrade.seller_id}`,
+        buyer: `House ${dbTrade.buyer_id}`, 
         amount: parseFloat(dbTrade.amount),
         price: parseFloat(dbTrade.price_per_kwh),
         timestamp: new Date(dbTrade.created_at).toLocaleTimeString('en-US', { 

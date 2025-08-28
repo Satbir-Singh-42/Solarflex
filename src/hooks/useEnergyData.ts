@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-// Production API configuration
-const API_BASE_URL = window.location.port === '5000' 
-  ? `http://${window.location.hostname}:3001/api`
-  : 'http://localhost:3001/api';
+// Fixed API configuration - always use localhost for Replit environment
+const API_BASE_URL = 'http://localhost:3001/api';
 
 interface Trade {
   id: string;
@@ -57,16 +55,25 @@ export const useForecasts = () => {
   return useQuery<ForecastResponse>({
     queryKey: ['forecasts'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/forecasts`, {
-        mode: 'cors',
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch forecasts');
+      try {
+        const response = await fetch(`${API_BASE_URL}/forecasts`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+      } catch (error) {
+        console.error('Error fetching forecasts:', error);
+        throw error;
       }
-      return response.json();
     },
-    refetchInterval: 15000, // Refresh every 15 seconds for real-time updates
+    refetchInterval: 30000, // Reduced frequency to avoid overwhelming the server
+    retry: 1,
+    retryDelay: 1000,
   });
 };
 
@@ -74,16 +81,25 @@ export const useTrades = () => {
   return useQuery<TradeData>({
     queryKey: ['trades'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/trades`, {
-        mode: 'cors',
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch trades');
+      try {
+        const response = await fetch(`${API_BASE_URL}/trades`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+      } catch (error) {
+        console.error('Error fetching trades:', error);
+        throw error;
       }
-      return response.json();
     },
-    refetchInterval: 10000, // Refresh every 10 seconds
+    refetchInterval: 30000,
+    retry: 1,
+    retryDelay: 1000,
   });
 };
 
@@ -91,15 +107,24 @@ export const useGridHealth = () => {
   return useQuery<GridHealthData>({
     queryKey: ['grid-health'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/grid-health`, {
-        mode: 'cors',
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch grid health');
+      try {
+        const response = await fetch(`${API_BASE_URL}/grid-health`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+      } catch (error) {
+        console.error('Error fetching grid health:', error);
+        throw error;
       }
-      return response.json();
     },
-    refetchInterval: 5000, // Refresh every 5 seconds for critical data
+    refetchInterval: 30000,
+    retry: 1,
+    retryDelay: 1000,
   });
 };
