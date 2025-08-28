@@ -15,7 +15,12 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors({
-  origin: true,
+  origin: [
+    'http://localhost:5000',
+    'https://localhost:5000',
+    /.*\.replit\.dev$/,
+    /.*\.repl\.co$/
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
